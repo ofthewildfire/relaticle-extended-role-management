@@ -21,7 +21,7 @@ class ManageTeamRoles extends Page implements Tables\Contracts\HasTable
 {
     use Tables\Concerns\InteractsWithTable;
 
-    protected static string $view = 'filament.pages.manage-team-roles';
+    protected static string $view = 'enhanced-role-system::filament.pages.manage-team-roles';
     protected static ?string $navigationIcon = 'heroicon-o-users';
     protected static ?string $navigationLabel = 'Team Roles';
     protected static ?string $navigationGroup = 'Team Management';
