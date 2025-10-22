@@ -1,0 +1,52 @@
+{
+  "name": "Ofthewildfire/enhanced-role-system-plugin",
+  "description": "Extended role-based access control plugin for Relaticle Laravel Filament applications with team/tenant support",
+  "keywords": [
+    "laravel",
+    "filament",
+    "plugin",
+    "roles",
+    "permissions",
+    "teams",
+    "access-control",
+    "rbac",
+    "multi-tenant"
+  ],
+  "type": "library",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Ofthewildfire"
+    }
+  ],
+  "require": {
+    "php": "^8.1",
+    "laravel/framework": "^10.0|^11.0",
+    "filament/filament": "^3.0",
+    "laravel/jetstream": "^4.0|^5.0"
+  },
+  "require-dev": {
+    "orchestra/testbench": "^8.0|^9.0",
+    "phpunit/phpunit": "^10.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "Ofthewildfire\\EnhancedRoleSystem\\": "src/"
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Ofthewildfire\\EnhancedRoleSystem\\EnhancedRoleSystemServiceProvider"
+      ]
+    }
+  },
+  "config": {
+    "sort-packages": true
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true,
+  "scripts": {
+    "test": "vendor/bin/phpunit"
+  }
+}
