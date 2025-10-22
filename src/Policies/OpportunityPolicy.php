@@ -6,7 +6,7 @@ namespace Ofthewildfire\EnhancedRoleSystem\Policies;
 
 use App\Models\Opportunity;
 use App\Models\User;
-use Ofthewildfire\EnhancedRoleSystemPlugin;
+use Ofthewildfire\EnhancedRoleSystem\EnhancedRoleSystemPlugin;
 use Filament\Facades\Filament;
 
 final readonly class OpportunityPolicy

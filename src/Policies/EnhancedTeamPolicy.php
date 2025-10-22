@@ -6,7 +6,7 @@ namespace Ofthewildfire\EnhancedRoleSystem\Policies;
 
 use App\Models\Team;
 use App\Models\User;
-use Ofthewildfire\EnhancedRoleSystemPlugin;
+use Ofthewildfire\EnhancedRoleSystem\EnhancedRoleSystemPlugin;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 final readonly class EnhancedTeamPolicy

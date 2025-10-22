@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Ofthewildfire\EnhancedRoleSystemPlugin;
+namespace Ofthewildfire\EnhancedRoleSystem;
 
 use Filament\Contracts\Plugin;
 use Filament\Panel;
