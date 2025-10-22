@@ -35,6 +35,7 @@ class EnhancedRoleSystemServiceProvider extends ServiceProvider
     public function boot(): void
     {
       $this->loadMigrationsFrom(__DIR__.'/../database');
+      $this->loadViewsFrom(__DIR__.'/../resources/views', 'enhanced-role-system');
       $this->registerPolicies();
       $this->publishMigrations();
     }
