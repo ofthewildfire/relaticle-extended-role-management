@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Ofthewildfire\EnhancedRoleSystem\Pages;
 
 use App\Models\User;
-use Ofthewildfire\EnhancedRoleSystemPlugin;
+use Ofthewildfire\EnhancedRoleSystem\EnhancedRoleSystemPlugin;
 use Filament\Actions;
 use Filament\Facades\Filament;
 use Filament\Forms;

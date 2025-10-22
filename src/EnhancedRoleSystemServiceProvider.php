@@ -34,8 +34,9 @@ class EnhancedRoleSystemServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $this->registerPolicies();
-        $this->publishMigrations();
+      $this->loadMigrationsFrom(__DIR__.'/../database');
+      $this->registerPolicies();
+      $this->publishMigrations();
     }
 
     protected function registerPolicies(): void
@@ -53,6 +54,7 @@ class EnhancedRoleSystemServiceProvider extends ServiceProvider
 
     protected function publishMigrations(): void
     {
-        // Migrations are already in the standard migrations directory
+        // Migrations in the regular app place... the default db/migrations :)
     }
+
 }
