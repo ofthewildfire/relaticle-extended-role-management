@@ -1,5 +1,5 @@
 {
-  "name": "Ofthewildfire/enhanced-role-system-plugin",
+  "name": "ofthewildfire/enhanced-role-system-plugin",
   "description": "Extended role-based access control plugin for Relaticle Laravel Filament applications with team/tenant support",
   "keywords": [
     "laravel",
