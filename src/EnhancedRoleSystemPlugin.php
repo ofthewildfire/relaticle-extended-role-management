@@ -38,6 +38,25 @@ class EnhancedRoleSystemPlugin implements Plugin
                 \Ofthewildfire\EnhancedRoleSystem\Pages\ManageTeamRoles::class,
             ]);
         }
+
+        // Configure default route based on user permissions
+        $panel->default(function () {
+            $user = auth()->user();
+            $team = \Filament\Facades\Filament::getTenant();
+            
+            if (!$user || !$team) {
+                return null; // Let Filament handle this
+            }
+            
+            $firstAccessibleResource = $this->getFirstAccessibleResource($user, $team);
+            
+            if ($firstAccessibleResource) {
+                // Build the proper team resource URL
+                return "/app/team/{$team->id}/{$firstAccessibleResource}";
+            }
+            
+            return null; // Fallback to default
+        });
     }
 
     public function boot(Panel $panel): void
@@ -45,7 +64,6 @@ class EnhancedRoleSystemPlugin implements Plugin
         $this->registerGates();
         $this->registerPolicies();
         $this->registerMiddleware();
-        $this->configureDefaultResource($panel);
     }
 
     public function superAdminEmails(array $emails): static
@@ -344,8 +362,4 @@ class EnhancedRoleSystemPlugin implements Plugin
         return null;
     }
 
-    protected function configureDefaultResource(Panel $panel): void
-    {
-        // We'll handle this via middleware instead since we need to check the current URL
-    }
 }
