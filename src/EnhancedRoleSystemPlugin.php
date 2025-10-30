@@ -39,24 +39,6 @@ class EnhancedRoleSystemPlugin implements Plugin
             ]);
         }
 
-        // Configure default route based on user permissions
-        $panel->default(function () {
-            $user = auth()->user();
-            $team = \Filament\Facades\Filament::getTenant();
-            
-            if (!$user || !$team) {
-                return null; // Let Filament handle this
-            }
-            
-            $firstAccessibleResource = $this->getFirstAccessibleResource($user, $team);
-            
-            if ($firstAccessibleResource) {
-                // Build the proper team resource URL
-                return "/app/team/{$team->id}/{$firstAccessibleResource}";
-            }
-            
-            return null; // Fallback to default
-        });
     }
 
     public function boot(Panel $panel): void

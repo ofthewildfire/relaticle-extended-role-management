@@ -16,9 +16,29 @@ class ResourceAccessRedirectMiddleware
 {
     public function handle(Request $request, Closure $next): SymfonyResponse
     {
+        // Check BEFORE processing the request if user doesn't have access
+        if (Auth::check()) {
+            $user = Auth::user();
+            $team = Filament::getTenant();
+            
+            if ($user && $team && $this->isTeamResourceRequest($request)) {
+                $currentResource = $this->getCurrentResource($request);
+                $plugin = app(EnhancedRoleSystemPlugin::class);
+                
+                // Check if user has access to current resource
+                if ($currentResource && !$plugin->hasResourcePermission($user, $team, $currentResource, 'view')) {
+                    $newUrl = $this->getRedirectUrl($request, $user, $team);
+                    
+                    if ($newUrl) {
+                        return redirect()->to($newUrl);
+                    }
+                }
+            }
+        }
+        
         $response = $next($request);
         
-        // Only handle 403 errors for authenticated users on team resource URLs
+        // Also handle 403 errors as backup
         if ($response->getStatusCode() === 403 && Auth::check()) {
             $user = Auth::user();
             $team = Filament::getTenant();
@@ -41,6 +61,18 @@ class ResourceAccessRedirectMiddleware
         
         // Check if this matches the pattern: app/team/{id}/{resource}
         return preg_match('#^app/team/\d+/[a-zA-Z]+#', $path);
+    }
+    
+    protected function getCurrentResource(Request $request): ?string
+    {
+        $path = $request->path();
+        
+        // Extract resource from URL pattern: app/team/{id}/{resource}
+        if (preg_match('#^app/team/\d+/([a-zA-Z]+)#', $path, $matches)) {
+            return $matches[1]; // companies, tasks, etc.
+        }
+        
+        return null;
     }
     
     protected function getRedirectUrl(Request $request, $user, $team): ?string
