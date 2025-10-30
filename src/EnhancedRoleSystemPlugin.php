@@ -39,6 +39,23 @@ class EnhancedRoleSystemPlugin implements Plugin
             ]);
         }
 
+        // Override the login redirect
+        $panel->loginRedirectsTo(function () {
+            $user = auth()->user();
+            $team = \Filament\Facades\Filament::getTenant();
+            
+            if (!$user || !$team) {
+                return '/app'; // Fallback
+            }
+            
+            $firstAccessibleResource = $this->getFirstAccessibleResource($user, $team);
+            
+            if ($firstAccessibleResource) {
+                return "/app/team/{$team->id}/{$firstAccessibleResource}";
+            }
+            
+            return '/app'; // Fallback
+        });
     }
 
     public function boot(Panel $panel): void
