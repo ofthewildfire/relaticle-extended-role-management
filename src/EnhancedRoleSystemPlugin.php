@@ -45,6 +45,7 @@ class EnhancedRoleSystemPlugin implements Plugin
         $this->registerGates();
         $this->registerPolicies();
         $this->registerMiddleware();
+        $this->configureDefaultResource($panel);
     }
 
     public function superAdminEmails(array $emails): static
@@ -90,7 +91,8 @@ class EnhancedRoleSystemPlugin implements Plugin
 
     protected function registerMiddleware(): void
     {
-        // Register any plugin-specific middleware
+        // Register resource access redirect middleware
+        app('router')->pushMiddlewareToGroup('web', \Ofthewildfire\EnhancedRoleSystem\Middleware\ResourceAccessRedirectMiddleware::class);
     }
 
     public function getRoleInTeam($user, $team): ?string
@@ -322,5 +324,28 @@ class EnhancedRoleSystemPlugin implements Plugin
         }
 
         return $permissions;
+    }
+
+    public function getFirstAccessibleResource($user, $team): ?string
+    {
+        if (!$user || !$team) {
+            return null;
+        }
+
+        // Priority order for default resource
+        $priorityOrder = ['tasks', 'notes', 'people', 'projects', 'opportunities', 'ideas', 'events', 'companies'];
+        
+        foreach ($priorityOrder as $resource) {
+            if ($this->hasResourcePermission($user, $team, $resource, 'view')) {
+                return $resource;
+            }
+        }
+        
+        return null;
+    }
+
+    protected function configureDefaultResource(Panel $panel): void
+    {
+        // We'll handle this via middleware instead since we need to check the current URL
     }
 }
