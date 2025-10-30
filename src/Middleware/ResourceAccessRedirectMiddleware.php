@@ -16,6 +16,12 @@ class ResourceAccessRedirectMiddleware
 {
     public function handle(Request $request, Closure $next): SymfonyResponse
     {
+        // Check for login redirect first
+        if (Auth::check() && session()->has('login_redirect_url')) {
+            $redirectUrl = session()->pull('login_redirect_url');
+            return redirect()->to($redirectUrl);
+        }
+        
         // Check BEFORE processing the request if user doesn't have access
         if (Auth::check()) {
             $user = Auth::user();
