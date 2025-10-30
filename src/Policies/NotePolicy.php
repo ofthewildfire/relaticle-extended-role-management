@@ -19,51 +19,73 @@ final readonly class NotePolicy
     public function viewAny(User $user): bool
     {
         $team = Filament::getTenant();
-        return $team && $user->belongsToTeam($team);
+        if (!$team || !$user->belongsToTeam($team)) {
+            return false;
+        }
+        
+        $plugin = $this->getPlugin();
+        return $plugin->hasResourcePermission($user, $team, 'notes', 'view');
     }
 
     public function view(User $user, Note $note): bool
     {
-        return $user->belongsToTeam($note->team);
+        if (!$user->belongsToTeam($note->team)) {
+            return false;
+        }
+        
+        $plugin = $this->getPlugin();
+        return $plugin->hasResourcePermission($user, $note->team, 'notes', 'view');
     }
 
     public function create(User $user): bool
     {
         $team = Filament::getTenant();
+        if (!$team) {
+            return false;
+        }
+        
         $plugin = $this->getPlugin();
-        return $team && $plugin->hasMinimumRole($user, $team, 'member');
+        return $plugin->hasResourcePermission($user, $team, 'notes', 'create');
     }
 
     public function update(User $user, Note $note): bool
     {
         $plugin = $this->getPlugin();
         
-        // Admins can edit anything
-        if ($plugin->hasMinimumRole($user, $note->team, 'admin')) {
+        // Check if user has edit permission for notes
+        if (!$plugin->hasResourcePermission($user, $note->team, 'notes', 'edit')) {
+            return false;
+        }
+        
+        // If user has delete permission, they can edit anything
+        if ($plugin->hasResourcePermission($user, $note->team, 'notes', 'delete')) {
             return true;
         }
         
-        // Members can only edit their own entries
-        if ($plugin->hasMinimumRole($user, $note->team, 'member')) {
-            return $note->creator_id === $user->id;
-        }
-        
-        return false;
+        // If user only has edit permission, they can only edit their own entries
+        return $note->creator_id === $user->id;
     }
 
     public function delete(User $user, Note $note): bool
     {
-        return $this->update($user, $note);
+        $plugin = $this->getPlugin();
+        
+        // Check if user has delete permission for notes
+        if (!$plugin->hasResourcePermission($user, $note->team, 'notes', 'delete')) {
+            return false;
+        }
+        
+        // If user has delete permission, they can delete anything
+        return true;
     }
 
     public function restore(User $user, Note $note): bool
     {
-        return $this->update($user, $note);
+        return $this->delete($user, $note);
     }
 
     public function forceDelete(User $user, Note $note): bool
     {
-        $plugin = $this->getPlugin();
-        return $plugin->hasMinimumRole($user, $note->team, 'admin');
+        return $this->delete($user, $note);
     }
 }

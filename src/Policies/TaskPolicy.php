@@ -19,51 +19,73 @@ final readonly class TaskPolicy
     public function viewAny(User $user): bool
     {
         $team = Filament::getTenant();
-        return $team && $user->belongsToTeam($team);
+        if (!$team || !$user->belongsToTeam($team)) {
+            return false;
+        }
+        
+        $plugin = $this->getPlugin();
+        return $plugin->hasResourcePermission($user, $team, 'tasks', 'view');
     }
 
     public function view(User $user, Task $task): bool
     {
-        return $user->belongsToTeam($task->team);
+        if (!$user->belongsToTeam($task->team)) {
+            return false;
+        }
+        
+        $plugin = $this->getPlugin();
+        return $plugin->hasResourcePermission($user, $task->team, 'tasks', 'view');
     }
 
     public function create(User $user): bool
     {
         $team = Filament::getTenant();
+        if (!$team) {
+            return false;
+        }
+        
         $plugin = $this->getPlugin();
-        return $team && $plugin->hasMinimumRole($user, $team, 'member');
+        return $plugin->hasResourcePermission($user, $team, 'tasks', 'create');
     }
 
     public function update(User $user, Task $task): bool
     {
         $plugin = $this->getPlugin();
         
-        // Admins can edit anything
-        if ($plugin->hasMinimumRole($user, $task->team, 'admin')) {
+        // Check if user has edit permission for tasks
+        if (!$plugin->hasResourcePermission($user, $task->team, 'tasks', 'edit')) {
+            return false;
+        }
+        
+        // If user has delete permission, they can edit anything
+        if ($plugin->hasResourcePermission($user, $task->team, 'tasks', 'delete')) {
             return true;
         }
         
-        // Members can only edit their own entries
-        if ($plugin->hasMinimumRole($user, $task->team, 'member')) {
-            return $task->creator_id === $user->id;
-        }
-        
-        return false;
+        // If user only has edit permission, they can only edit their own entries
+        return $task->creator_id === $user->id;
     }
 
     public function delete(User $user, Task $task): bool
     {
-        return $this->update($user, $task);
+        $plugin = $this->getPlugin();
+        
+        // Check if user has delete permission for tasks
+        if (!$plugin->hasResourcePermission($user, $task->team, 'tasks', 'delete')) {
+            return false;
+        }
+        
+        // If user has delete permission, they can delete anything
+        return true;
     }
 
     public function restore(User $user, Task $task): bool
     {
-        return $this->update($user, $task);
+        return $this->delete($user, $task);
     }
 
     public function forceDelete(User $user, Task $task): bool
     {
-        $plugin = $this->getPlugin();
-        return $plugin->hasMinimumRole($user, $task->team, 'admin');
+        return $this->delete($user, $task);
     }
 }

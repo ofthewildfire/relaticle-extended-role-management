@@ -19,51 +19,73 @@ final readonly class ProjectsPolicy
     public function viewAny(User $user): bool
     {
         $team = Filament::getTenant();
-        return $team && $user->belongsToTeam($team);
+        if (!$team || !$user->belongsToTeam($team)) {
+            return false;
+        }
+        
+        $plugin = $this->getPlugin();
+        return $plugin->hasResourcePermission($user, $team, 'projects', 'view');
     }
 
     public function view(User $user, Projects $project): bool
     {
-        return $user->belongsToTeam($project->team);
+        if (!$user->belongsToTeam($project->team)) {
+            return false;
+        }
+        
+        $plugin = $this->getPlugin();
+        return $plugin->hasResourcePermission($user, $project->team, 'projects', 'view');
     }
 
     public function create(User $user): bool
     {
         $team = Filament::getTenant();
+        if (!$team) {
+            return false;
+        }
+        
         $plugin = $this->getPlugin();
-        return $team && $plugin->hasMinimumRole($user, $team, 'member');
+        return $plugin->hasResourcePermission($user, $team, 'projects', 'create');
     }
 
     public function update(User $user, Projects $project): bool
     {
         $plugin = $this->getPlugin();
         
-        // Admins can edit anything
-        if ($plugin->hasMinimumRole($user, $project->team, 'admin')) {
+        // Check if user has edit permission for projects
+        if (!$plugin->hasResourcePermission($user, $project->team, 'projects', 'edit')) {
+            return false;
+        }
+        
+        // If user has delete permission, they can edit anything
+        if ($plugin->hasResourcePermission($user, $project->team, 'projects', 'delete')) {
             return true;
         }
         
-        // Members can only edit their own entries
-        if ($plugin->hasMinimumRole($user, $project->team, 'member')) {
-            return $project->created_by === $user->id;
-        }
-        
-        return false;
+        // If user only has edit permission, they can only edit their own entries
+        return $project->created_by === $user->id;
     }
 
     public function delete(User $user, Projects $project): bool
     {
-        return $this->update($user, $project);
+        $plugin = $this->getPlugin();
+        
+        // Check if user has delete permission for projects
+        if (!$plugin->hasResourcePermission($user, $project->team, 'projects', 'delete')) {
+            return false;
+        }
+        
+        // If user has delete permission, they can delete anything
+        return true;
     }
 
     public function restore(User $user, Projects $project): bool
     {
-        return $this->update($user, $project);
+        return $this->delete($user, $project);
     }
 
     public function forceDelete(User $user, Projects $project): bool
     {
-        $plugin = $this->getPlugin();
-        return $plugin->hasMinimumRole($user, $project->team, 'admin');
+        return $this->delete($user, $project);
     }
 }

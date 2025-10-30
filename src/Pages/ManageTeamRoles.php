@@ -120,6 +120,31 @@ class ManageTeamRoles extends Page implements Tables\Contracts\HasTable
                     ->action(function (User $record, array $data) {
                         $this->changeUserRole($record, $data['role']);
                     }),
+                Tables\Actions\Action::make('manageResourcePermissions')
+                    ->label('Resource Permissions')
+                    ->icon('heroicon-o-key')
+                    ->visible(fn(User $record) => $this->canManageUserRole($record))
+                    ->form(function (User $record) use ($plugin) {
+                        $team = Filament::getTenant();
+                        $currentPermissions = $plugin->getUserResourcePermissions($record, $team);
+                        $resources = $plugin->getAvailableResources();
+                        $permissionLevels = $plugin->getPermissionLevels();
+                        
+                        $formComponents = [];
+                        foreach ($resources as $resourceKey => $resourceLabel) {
+                            $formComponents[] = Forms\Components\Select::make("permissions.{$resourceKey}")
+                                ->label($resourceLabel)
+                                ->options($permissionLevels)
+                                ->default($currentPermissions[$resourceKey] ?? 'none')
+                                ->selectablePlaceholder(false)
+                                ->required();
+                        }
+                        
+                        return $formComponents;
+                    })
+                    ->action(function (User $record, array $data) {
+                        $this->updateResourcePermissions($record, $data['permissions'] ?? []);
+                    }),
                 Tables\Actions\Action::make('remove')
                     ->label('Remove from Team')
                     ->icon('heroicon-o-trash')
@@ -233,6 +258,28 @@ class ManageTeamRoles extends Page implements Tables\Contracts\HasTable
         Notification::make()
             ->title('Role Updated')
             ->body("User {$user->name} role changed to {$plugin->getRoleLabel($newRole)}")
+            ->success()
+            ->send();
+            
+        // Refresh the table
+        $this->resetTable();
+    }
+
+    protected function updateResourcePermissions(User $user, array $permissions): void
+    {
+        $team = Filament::getTenant();
+        $plugin = app(EnhancedRoleSystemPlugin::class);
+        
+        $updatedCount = 0;
+        foreach ($permissions as $resource => $permissionLevel) {
+            if ($plugin->setResourcePermission($user, $team, $resource, $permissionLevel)) {
+                $updatedCount++;
+            }
+        }
+        
+        Notification::make()
+            ->title('Resource Permissions Updated')
+            ->body("Updated {$updatedCount} resource permissions for {$user->name}")
             ->success()
             ->send();
             

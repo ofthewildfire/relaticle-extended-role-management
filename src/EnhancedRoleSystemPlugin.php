@@ -193,4 +193,134 @@ class EnhancedRoleSystemPlugin implements Plugin
             default => [],
         };
     }
+
+    public function getResourcePermission($user, $team, string $resource): string
+    {
+        if (!$user || !$team) {
+            return 'none';
+        }
+
+        // Team owners have full access to all resources
+        if ($team->user_id === $user->id) {
+            return 'delete';
+        }
+
+        // Check for specific resource permission
+        $permission = \DB::table('team_user_resource_permissions')
+            ->where('team_id', $team->id)
+            ->where('user_id', $user->id)
+            ->where('resource', $resource)
+            ->value('permission_level');
+
+        if ($permission) {
+            return $permission;
+        }
+
+        // Fall back to role-based permissions if no specific resource permission exists
+        $userRole = $this->getRoleInTeam($user, $team);
+        
+        return match($userRole) {
+            'super_admin' => 'delete',
+            'admin' => 'delete',
+            'member' => 'create',
+            'viewer' => 'view',
+            default => 'none',
+        };
+    }
+
+    public function hasResourcePermission($user, $team, string $resource, string $requiredPermission): bool
+    {
+        if (!$user || !$team) {
+            return false;
+        }
+
+        $userPermission = $this->getResourcePermission($user, $team, $resource);
+        
+        $permissionHierarchy = [
+            'none' => 0,
+            'view' => 1,
+            'create' => 2,
+            'edit' => 3,
+            'delete' => 4,
+        ];
+
+        return ($permissionHierarchy[$userPermission] ?? 0) >= ($permissionHierarchy[$requiredPermission] ?? 999);
+    }
+
+    public function setResourcePermission($user, $team, string $resource, string $permissionLevel): bool
+    {
+        if (!$user || !$team) {
+            return false;
+        }
+
+        // Validate permission level
+        $validPermissions = ['none', 'view', 'create', 'edit', 'delete'];
+        if (!in_array($permissionLevel, $validPermissions)) {
+            return false;
+        }
+
+        \DB::table('team_user_resource_permissions')
+            ->updateOrInsert(
+                [
+                    'team_id' => $team->id,
+                    'user_id' => $user->id,
+                    'resource' => $resource,
+                ],
+                [
+                    'permission_level' => $permissionLevel,
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
+
+        return true;
+    }
+
+    public function getAvailableResources(): array
+    {
+        return [
+            'tasks' => 'Tasks',
+            'people' => 'People',
+            'companies' => 'Companies',
+            'events' => 'Events',
+            'ideas' => 'Ideas',
+            'notes' => 'Notes',
+            'opportunities' => 'Opportunities',
+            'projects' => 'Projects',
+        ];
+    }
+
+    public function getPermissionLevels(): array
+    {
+        return [
+            'none' => 'No Access',
+            'view' => 'View Only',
+            'create' => 'View & Create',
+            'edit' => 'View, Create & Edit',
+            'delete' => 'Full Access',
+        ];
+    }
+
+    public function getUserResourcePermissions($user, $team): array
+    {
+        if (!$user || !$team) {
+            return [];
+        }
+
+        $permissions = \DB::table('team_user_resource_permissions')
+            ->where('team_id', $team->id)
+            ->where('user_id', $user->id)
+            ->pluck('permission_level', 'resource')
+            ->toArray();
+
+        // Fill in defaults for resources without specific permissions
+        $resources = array_keys($this->getAvailableResources());
+        foreach ($resources as $resource) {
+            if (!isset($permissions[$resource])) {
+                $permissions[$resource] = $this->getResourcePermission($user, $team, $resource);
+            }
+        }
+
+        return $permissions;
+    }
 }

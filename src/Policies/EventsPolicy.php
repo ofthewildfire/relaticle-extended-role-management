@@ -19,51 +19,73 @@ final readonly class EventsPolicy
     public function viewAny(User $user): bool
     {
         $team = Filament::getTenant();
-        return $team && $user->belongsToTeam($team);
+        if (!$team || !$user->belongsToTeam($team)) {
+            return false;
+        }
+        
+        $plugin = $this->getPlugin();
+        return $plugin->hasResourcePermission($user, $team, 'events', 'view');
     }
 
     public function view(User $user, Events $event): bool
     {
-        return $user->belongsToTeam($event->team);
+        if (!$user->belongsToTeam($event->team)) {
+            return false;
+        }
+        
+        $plugin = $this->getPlugin();
+        return $plugin->hasResourcePermission($user, $event->team, 'events', 'view');
     }
 
     public function create(User $user): bool
     {
         $team = Filament::getTenant();
+        if (!$team) {
+            return false;
+        }
+        
         $plugin = $this->getPlugin();
-        return $team && $plugin->hasMinimumRole($user, $team, 'member');
+        return $plugin->hasResourcePermission($user, $team, 'events', 'create');
     }
 
     public function update(User $user, Events $event): bool
     {
         $plugin = $this->getPlugin();
         
-        // Admins can edit anything
-        if ($plugin->hasMinimumRole($user, $event->team, 'admin')) {
+        // Check if user has edit permission for events
+        if (!$plugin->hasResourcePermission($user, $event->team, 'events', 'edit')) {
+            return false;
+        }
+        
+        // If user has delete permission, they can edit anything
+        if ($plugin->hasResourcePermission($user, $event->team, 'events', 'delete')) {
             return true;
         }
         
-        // Members can only edit their own entries
-        if ($plugin->hasMinimumRole($user, $event->team, 'member')) {
-            return $event->created_by === $user->id;
-        }
-        
-        return false;
+        // If user only has edit permission, they can only edit their own entries
+        return $event->created_by === $user->id;
     }
 
     public function delete(User $user, Events $event): bool
     {
-        return $this->update($user, $event);
+        $plugin = $this->getPlugin();
+        
+        // Check if user has delete permission for events
+        if (!$plugin->hasResourcePermission($user, $event->team, 'events', 'delete')) {
+            return false;
+        }
+        
+        // If user has delete permission, they can delete anything
+        return true;
     }
 
     public function restore(User $user, Events $event): bool
     {
-        return $this->update($user, $event);
+        return $this->delete($user, $event);
     }
 
     public function forceDelete(User $user, Events $event): bool
     {
-        $plugin = $this->getPlugin();
-        return $plugin->hasMinimumRole($user, $event->team, 'admin');
+        return $this->delete($user, $event);
     }
 }

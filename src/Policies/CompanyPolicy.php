@@ -19,51 +19,73 @@ final readonly class CompanyPolicy
     public function viewAny(User $user): bool
     {
         $team = Filament::getTenant();
-        return $team && $user->belongsToTeam($team);
+        if (!$team || !$user->belongsToTeam($team)) {
+            return false;
+        }
+        
+        $plugin = $this->getPlugin();
+        return $plugin->hasResourcePermission($user, $team, 'companies', 'view');
     }
 
     public function view(User $user, Company $company): bool
     {
-        return $user->belongsToTeam($company->team);
+        if (!$user->belongsToTeam($company->team)) {
+            return false;
+        }
+        
+        $plugin = $this->getPlugin();
+        return $plugin->hasResourcePermission($user, $company->team, 'companies', 'view');
     }
 
     public function create(User $user): bool
     {
         $team = Filament::getTenant();
+        if (!$team) {
+            return false;
+        }
+        
         $plugin = $this->getPlugin();
-        return $team && $plugin->hasMinimumRole($user, $team, 'member');
+        return $plugin->hasResourcePermission($user, $team, 'companies', 'create');
     }
 
     public function update(User $user, Company $company): bool
     {
         $plugin = $this->getPlugin();
         
-        // Admins can edit anything
-        if ($plugin->hasMinimumRole($user, $company->team, 'admin')) {
+        // Check if user has edit permission for companies
+        if (!$plugin->hasResourcePermission($user, $company->team, 'companies', 'edit')) {
+            return false;
+        }
+        
+        // If user has delete permission, they can edit anything
+        if ($plugin->hasResourcePermission($user, $company->team, 'companies', 'delete')) {
             return true;
         }
         
-        // Members can only edit their own entries
-        if ($plugin->hasMinimumRole($user, $company->team, 'member')) {
-            return $company->creator_id === $user->id;
-        }
-        
-        return false;
+        // If user only has edit permission, they can only edit their own entries
+        return $company->creator_id === $user->id;
     }
 
     public function delete(User $user, Company $company): bool
     {
-        return $this->update($user, $company);
+        $plugin = $this->getPlugin();
+        
+        // Check if user has delete permission for companies
+        if (!$plugin->hasResourcePermission($user, $company->team, 'companies', 'delete')) {
+            return false;
+        }
+        
+        // If user has delete permission, they can delete anything
+        return true;
     }
 
     public function restore(User $user, Company $company): bool
     {
-        return $this->update($user, $company);
+        return $this->delete($user, $company);
     }
 
     public function forceDelete(User $user, Company $company): bool
     {
-        $plugin = $this->getPlugin();
-        return $plugin->hasMinimumRole($user, $company->team, 'admin');
+        return $this->delete($user, $company);
     }
 }
