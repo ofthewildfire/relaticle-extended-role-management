@@ -15,9 +15,20 @@ class ResourceAccessRedirectMiddleware
 {
     public function handle(Request $request, Closure $next): SymfonyResponse
     {
+        // Visual debugging - add debug info to session
+        $debugInfo = [
+            'middleware_running' => true,
+            'path' => $request->path(),
+            'url' => $request->url(),
+            'is_authenticated' => Auth::check(),
+            'has_login_redirect' => session()->has('login_redirect_url')
+        ];
+        
         // Check for login redirect first
         if (Auth::check() && session()->has('login_redirect_url')) {
             $redirectUrl = session()->pull('login_redirect_url');
+            $debugInfo['using_login_redirect'] = $redirectUrl;
+            session()->flash('debug_info', $debugInfo);
             return redirect()->to($redirectUrl);
         }
         
@@ -26,52 +37,94 @@ class ResourceAccessRedirectMiddleware
             $user = Auth::user();
             $team = Filament::getTenant();
             
+            $debugInfo['user_id'] = $user?->id;
+            $debugInfo['team_id'] = $team?->id;
+            $debugInfo['is_team_request'] = $this->isTeamResourceRequest($request);
+            
             if ($user && $team && $this->isTeamResourceRequest($request)) {
                 $currentResource = $this->getCurrentResource($request);
                 $plugin = app(EnhancedRoleSystemPlugin::class);
                 
+                $debugInfo['current_resource'] = $currentResource;
+                
                 // If no resource specified (just /app/team/{id}), redirect to first accessible resource
                 if (!$currentResource) {
-                    // Prevent infinite loops by checking if we already redirected
-                    if (session()->has('no_resource_access_check')) {
-                        session()->forget('no_resource_access_check');
-                        abort(403, 'You do not have access to any resources in this team.');
-                    }
-                    
                     $firstAccessibleResource = $plugin->getFirstAccessibleResource($user, $team);
+                    $debugInfo['no_resource_redirect'] = $firstAccessibleResource;
+                    session()->flash('debug_info', $debugInfo);
+                    
                     if ($firstAccessibleResource) {
                         return redirect()->to("/app/team/{$team->id}/{$firstAccessibleResource}");
                     } else {
-                        session()->put('no_resource_access_check', true);
                         return redirect()->to("/app/team/{$team->id}")
                             ->with('error', 'You do not have access to any resources in this team.');
                     }
                 }
                 
                 // Check if user has access to current resource
-                if ($currentResource && !$plugin->hasResourcePermission($user, $team, $currentResource, 'view')) {
-                    $newUrl = $this->getRedirectUrl($request, $user, $team);
+                if ($currentResource) {
+                    $hasPermission = $plugin->hasResourcePermission($user, $team, $currentResource, 'view');
+                    $debugInfo['has_permission'] = $hasPermission;
                     
-                    if ($newUrl) {
-                        return redirect()->to($newUrl);
-                    } else {
-                        // If no accessible resource found, redirect to team dashboard or show error
-                        return redirect()->to("/app/team/{$team->id}")
-                            ->with('error', 'You do not have access to any resources in this team.');
+                    if (!$hasPermission) {
+                        $newUrl = $this->getRedirectUrl($request, $user, $team);
+                        $debugInfo['redirect_url'] = $newUrl;
+                        session()->flash('debug_info', $debugInfo);
+                        
+                        if ($newUrl) {
+                            return redirect()->to($newUrl);
+                        } else {
+                            // Show debug info instead of generic error
+                            return response()->view('enhanced-role-system::debug', [
+                                'debug_info' => $debugInfo,
+                                'message' => 'No accessible resources found'
+                            ], 403);
+                        }
                     }
                 }
             }
         }
         
-        $response = $next($request);
+        session()->flash('debug_info', $debugInfo);
+        
+        try {
+            $response = $next($request);
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            // Catch HTTP exceptions (like 403, 404) and handle them
+            $debugInfo['caught_exception'] = $e->getStatusCode();
+            
+            if (in_array($e->getStatusCode(), [403, 404]) && Auth::check()) {
+                $user = Auth::user();
+                $team = Filament::getTenant();
+                
+                if ($user && $team && $this->isTeamResourceRequest($request)) {
+                    $newUrl = $this->getRedirectUrl($request, $user, $team);
+                    $debugInfo['exception_redirect'] = $newUrl;
+                    session()->flash('debug_info', $debugInfo);
+                    
+                    if ($newUrl) {
+                        return redirect()->to($newUrl);
+                    }
+                }
+            }
+            
+            // Re-throw the exception if we can't handle it
+            throw $e;
+        }
+        
+        $debugInfo['response_status'] = $response->getStatusCode();
         
         // Handle 404 and 403 errors as backup - this is crucial for the companies default issue
         if (in_array($response->getStatusCode(), [403, 404]) && Auth::check()) {
             $user = Auth::user();
             $team = Filament::getTenant();
             
+            $debugInfo['handling_error_response'] = true;
+            
             if ($user && $team && $this->isTeamResourceRequest($request)) {
                 $newUrl = $this->getRedirectUrl($request, $user, $team);
+                $debugInfo['error_redirect'] = $newUrl;
+                session()->flash('debug_info', $debugInfo);
                 
                 if ($newUrl) {
                     return redirect()->to($newUrl);
@@ -83,6 +136,7 @@ class ResourceAccessRedirectMiddleware
             }
         }
         
+        session()->flash('debug_info', $debugInfo);
         return $response;
     }
     
@@ -123,11 +177,6 @@ class ResourceAccessRedirectMiddleware
         $firstAccessibleResource = $plugin->getFirstAccessibleResource($user, $team);
         
         if (!$firstAccessibleResource) {
-            \Log::warning('No accessible resource found for user', [
-                'user_id' => $user->id,
-                'team_id' => $team->id,
-                'path' => $path
-            ]);
             return null;
         }
         
@@ -145,14 +194,6 @@ class ResourceAccessRedirectMiddleware
                 if (empty($remaining) || $remaining === '/' || preg_match('#^/?$#', $remaining)) {
                     $newUrl .= $remaining;
                 }
-                
-                \Log::info('Redirecting user to accessible resource', [
-                    'user_id' => $user->id,
-                    'team_id' => $team->id,
-                    'from_resource' => $currentResource,
-                    'to_resource' => $firstAccessibleResource,
-                    'new_url' => $newUrl
-                ]);
                 
                 return $newUrl;
             }

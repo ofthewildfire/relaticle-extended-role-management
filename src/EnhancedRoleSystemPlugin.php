@@ -45,6 +45,7 @@ class EnhancedRoleSystemPlugin implements Plugin
         $this->registerGates();
         $this->registerPolicies();
         $this->registerMiddleware();
+        $this->registerRoutes();
     }
 
     public function superAdminEmails(array $emails): static
@@ -92,6 +93,52 @@ class EnhancedRoleSystemPlugin implements Plugin
     {
         // Register resource access redirect middleware
         app('router')->pushMiddlewareToGroup('web', \Ofthewildfire\EnhancedRoleSystem\Middleware\ResourceAccessRedirectMiddleware::class);
+    }
+
+    protected function registerRoutes(): void
+    {
+        // Register a catch-all route for team access that redirects to first accessible resource
+        app('router')->group(['middleware' => ['web', 'auth']], function () {
+            app('router')->get('app/team/{team}', function ($teamId) {
+                $user = auth()->user();
+                $team = $user->teams()->find($teamId);
+                
+                if (!$team) {
+                    abort(404, 'Team not found');
+                }
+                
+                $plugin = app(EnhancedRoleSystemPlugin::class);
+                $firstAccessibleResource = $plugin->getFirstAccessibleResource($user, $team);
+                
+                if ($firstAccessibleResource) {
+                    return redirect()->to("/app/team/{$teamId}/{$firstAccessibleResource}");
+                } else {
+                    abort(403, 'You do not have access to any resources in this team.');
+                }
+            })->where('team', '[0-9]+');
+            
+            // Debug route
+            app('router')->get('debug/resource-access', function () {
+                $user = auth()->user();
+                $team = \Filament\Facades\Filament::getTenant();
+                $plugin = app(EnhancedRoleSystemPlugin::class);
+                
+                $debugInfo = [
+                    'user_id' => $user?->id,
+                    'team_id' => $team?->id,
+                    'available_resources' => $plugin->getAvailableResources(),
+                    'user_permissions' => $user && $team ? $plugin->getUserResourcePermissions($user, $team) : null,
+                    'first_accessible' => $user && $team ? $plugin->getFirstAccessibleResource($user, $team) : null,
+                    'request_path' => request()->path(),
+                    'session_debug' => session('debug_info')
+                ];
+                
+                return response()->view('enhanced-role-system::debug', [
+                    'debug_info' => $debugInfo,
+                    'message' => 'Debug Information'
+                ]);
+            });
+        });
     }
 
     public function getRoleInTeam($user, $team): ?string
