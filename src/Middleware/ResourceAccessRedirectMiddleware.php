@@ -6,7 +6,6 @@ namespace Ofthewildfire\EnhancedRoleSystem\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Filament\Facades\Filament;
 use Ofthewildfire\EnhancedRoleSystem\EnhancedRoleSystemPlugin;
@@ -31,12 +30,34 @@ class ResourceAccessRedirectMiddleware
                 $currentResource = $this->getCurrentResource($request);
                 $plugin = app(EnhancedRoleSystemPlugin::class);
                 
+                // If no resource specified (just /app/team/{id}), redirect to first accessible resource
+                if (!$currentResource) {
+                    // Prevent infinite loops by checking if we already redirected
+                    if (session()->has('no_resource_access_check')) {
+                        session()->forget('no_resource_access_check');
+                        abort(403, 'You do not have access to any resources in this team.');
+                    }
+                    
+                    $firstAccessibleResource = $plugin->getFirstAccessibleResource($user, $team);
+                    if ($firstAccessibleResource) {
+                        return redirect()->to("/app/team/{$team->id}/{$firstAccessibleResource}");
+                    } else {
+                        session()->put('no_resource_access_check', true);
+                        return redirect()->to("/app/team/{$team->id}")
+                            ->with('error', 'You do not have access to any resources in this team.');
+                    }
+                }
+                
                 // Check if user has access to current resource
                 if ($currentResource && !$plugin->hasResourcePermission($user, $team, $currentResource, 'view')) {
                     $newUrl = $this->getRedirectUrl($request, $user, $team);
                     
                     if ($newUrl) {
                         return redirect()->to($newUrl);
+                    } else {
+                        // If no accessible resource found, redirect to team dashboard or show error
+                        return redirect()->to("/app/team/{$team->id}")
+                            ->with('error', 'You do not have access to any resources in this team.');
                     }
                 }
             }
@@ -44,8 +65,8 @@ class ResourceAccessRedirectMiddleware
         
         $response = $next($request);
         
-        // Also handle 403 errors as backup
-        if ($response->getStatusCode() === 403 && Auth::check()) {
+        // Handle 404 and 403 errors as backup - this is crucial for the companies default issue
+        if (in_array($response->getStatusCode(), [403, 404]) && Auth::check()) {
             $user = Auth::user();
             $team = Filament::getTenant();
             
@@ -54,6 +75,10 @@ class ResourceAccessRedirectMiddleware
                 
                 if ($newUrl) {
                     return redirect()->to($newUrl);
+                } else {
+                    // If no accessible resource found, redirect to team dashboard
+                    return redirect()->to("/app/team/{$team->id}")
+                        ->with('error', 'You do not have access to any resources in this team.');
                 }
             }
         }
@@ -65,8 +90,8 @@ class ResourceAccessRedirectMiddleware
     {
         $path = $request->path();
         
-        // Check if this matches the pattern: app/team/{id}/{resource}
-        return preg_match('#^app/team/\d+/[a-zA-Z]+#', $path);
+        // Check if this matches the pattern: app/team/{id}/{resource} OR just app/team/{id}
+        return preg_match('#^app/team/\d+(/[a-zA-Z]*)?#', $path);
     }
     
     protected function getCurrentResource(Request $request): ?string
@@ -75,7 +100,15 @@ class ResourceAccessRedirectMiddleware
         
         // Extract resource from URL pattern: app/team/{id}/{resource}
         if (preg_match('#^app/team/\d+/([a-zA-Z]+)#', $path, $matches)) {
-            return $matches[1]; // companies, tasks, etc.
+            $resource = $matches[1];
+            
+            // Validate that this is actually a known resource
+            $plugin = app(EnhancedRoleSystemPlugin::class);
+            $availableResources = array_keys($plugin->getAvailableResources());
+            
+            if (in_array($resource, $availableResources)) {
+                return $resource;
+            }
         }
         
         return null;
@@ -86,18 +119,42 @@ class ResourceAccessRedirectMiddleware
         $path = $request->path();
         $plugin = app(EnhancedRoleSystemPlugin::class);
         
+        // Find the first accessible resource
+        $firstAccessibleResource = $plugin->getFirstAccessibleResource($user, $team);
+        
+        if (!$firstAccessibleResource) {
+            \Log::warning('No accessible resource found for user', [
+                'user_id' => $user->id,
+                'team_id' => $team->id,
+                'path' => $path
+            ]);
+            return null;
+        }
+        
         // Extract the current URL pattern: app/team/{id}/{resource}
         if (preg_match('#^(app/team/\d+/)([a-zA-Z]+)(.*)$#', $path, $matches)) {
             $baseUrl = $matches[1]; // app/team/{id}/
             $currentResource = $matches[2]; // companies, tasks, etc.
             $remaining = $matches[3]; // any additional path
             
-            // Find the first accessible resource
-            $firstAccessibleResource = $plugin->getFirstAccessibleResource($user, $team);
-            
-            if ($firstAccessibleResource && $firstAccessibleResource !== $currentResource) {
-                // Replace the resource part with the accessible one
-                return $baseUrl . $firstAccessibleResource . $remaining;
+            if ($firstAccessibleResource !== $currentResource) {
+                $newUrl = $baseUrl . $firstAccessibleResource;
+                
+                // Only append remaining path if it's just a simple list view (no specific record IDs)
+                // This prevents redirecting to a record that might not exist in the new resource
+                if (empty($remaining) || $remaining === '/' || preg_match('#^/?$#', $remaining)) {
+                    $newUrl .= $remaining;
+                }
+                
+                \Log::info('Redirecting user to accessible resource', [
+                    'user_id' => $user->id,
+                    'team_id' => $team->id,
+                    'from_resource' => $currentResource,
+                    'to_resource' => $firstAccessibleResource,
+                    'new_url' => $newUrl
+                ]);
+                
+                return $newUrl;
             }
         }
         
