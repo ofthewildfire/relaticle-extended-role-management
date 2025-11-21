@@ -112,18 +112,11 @@ class EnhancedRoleSystemServiceProvider extends ServiceProvider
 
     protected function registerMiddleware(): void
     {
-        // Register resource access redirect middleware early in the application lifecycle
         $router = app('router');
-        
-        // Try multiple approaches to ensure the middleware runs
         $router->pushMiddlewareToGroup('web', \Ofthewildfire\EnhancedRoleSystem\Middleware\ResourceAccessRedirectMiddleware::class);
         
-        // Also register as a global middleware
         $kernel = app(\Illuminate\Contracts\Http\Kernel::class);
         $kernel->pushMiddleware(\Ofthewildfire\EnhancedRoleSystem\Middleware\ResourceAccessRedirectMiddleware::class);
-        
-        // Register as named middleware too
-        $router->aliasMiddleware('resource-redirect', \Ofthewildfire\EnhancedRoleSystem\Middleware\ResourceAccessRedirectMiddleware::class);
     }
 
     protected function registerPolicies(): void
@@ -141,7 +134,7 @@ class EnhancedRoleSystemServiceProvider extends ServiceProvider
 
     protected function publishMigrations(): void
     {
-        // Migrations in the regular app place... the default db/migrations :)
+        //
     }
 
     protected function registerLoginRedirect(): void
@@ -159,7 +152,6 @@ class EnhancedRoleSystemServiceProvider extends ServiceProvider
             $team = $this->resolveTenantFromRequest($user);
             
             if (!$team) {
-                \Log::info('No team found for login redirect', ['user_id' => $user->id]);
                 return;
             }
             
@@ -169,28 +161,9 @@ class EnhancedRoleSystemServiceProvider extends ServiceProvider
                 
                 if ($firstAccessibleResource) {
                     $redirectUrl = "/app/team/{$team->id}/{$firstAccessibleResource}";
-                    
-                    // Store the redirect URL in session to be used after login
                     session()->put('login_redirect_url', $redirectUrl);
-                    
-                    \Log::info('Login redirect URL set', [
-                        'user_id' => $user->id,
-                        'team_id' => $team->id,
-                        'resource' => $firstAccessibleResource,
-                        'url' => $redirectUrl
-                    ]);
-                } else {
-                    \Log::warning('No accessible resource found for user on login', [
-                        'user_id' => $user->id,
-                        'team_id' => $team->id
-                    ]);
                 }
             } catch (\Exception $e) {
-                \Log::warning('Failed to determine login redirect', [
-                    'error' => $e->getMessage(),
-                    'user_id' => $user->id,
-                    'team_id' => $team->id ?? 'unknown'
-                ]);
                 return;
             }
         });
