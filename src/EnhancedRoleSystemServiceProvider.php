@@ -29,7 +29,8 @@ class EnhancedRoleSystemServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        // Register any services
+        // Register middleware early
+        $this->registerMiddleware();
     }
 
     public function boot(): void
@@ -39,6 +40,90 @@ class EnhancedRoleSystemServiceProvider extends ServiceProvider
       $this->registerPolicies();
       $this->publishMigrations();
       $this->registerLoginRedirect();
+      $this->registerRoutes();
+    }
+
+    protected function registerRoutes(): void
+    {
+        // Register a simple redirect route that catches resource access attempts
+        app('router')->group(['middleware' => ['web', 'auth']], function () {
+            // Catch specific resource routes and redirect if no access
+            app('router')->get('app/team/{team}/companies', function ($teamId) {
+                $user = auth()->user();
+                $team = $user->teams()->find($teamId);
+                
+                if (!$team) {
+                    abort(404, 'Team not found');
+                }
+                
+                $plugin = app(EnhancedRoleSystemPlugin::class);
+                
+                // Check if user has access to companies
+                if (!$plugin->hasResourcePermission($user, $team, 'companies', 'view')) {
+                    // Find first accessible resource
+                    $firstAccessibleResource = $plugin->getFirstAccessibleResource($user, $team);
+                    
+                    if ($firstAccessibleResource) {
+                        return redirect()->to("/app/team/{$teamId}/{$firstAccessibleResource}");
+                    } else {
+                        abort(403, 'You do not have access to any resources in this team.');
+                    }
+                }
+                
+                // If they do have access, let Filament handle it normally
+                // This route won't match and Filament's route will take over
+                abort(404);
+                
+            })->where('team', '[0-9]+');
+            
+            // Add similar routes for other resources
+            $resources = ['tasks', 'people', 'events', 'ideas', 'notes', 'opportunities', 'projects'];
+            
+            foreach ($resources as $resource) {
+                app('router')->get("app/team/{team}/{$resource}", function ($teamId) use ($resource) {
+                    $user = auth()->user();
+                    $team = $user->teams()->find($teamId);
+                    
+                    if (!$team) {
+                        abort(404, 'Team not found');
+                    }
+                    
+                    $plugin = app(EnhancedRoleSystemPlugin::class);
+                    
+                    // Check if user has access to this resource
+                    if (!$plugin->hasResourcePermission($user, $team, $resource, 'view')) {
+                        // Find first accessible resource
+                        $firstAccessibleResource = $plugin->getFirstAccessibleResource($user, $team);
+                        
+                        if ($firstAccessibleResource) {
+                            return redirect()->to("/app/team/{$teamId}/{$firstAccessibleResource}");
+                        } else {
+                            abort(403, 'You do not have access to any resources in this team.');
+                        }
+                    }
+                    
+                    // If they do have access, let Filament handle it normally
+                    abort(404);
+                    
+                })->where('team', '[0-9]+');
+            }
+        });
+    }
+
+    protected function registerMiddleware(): void
+    {
+        // Register resource access redirect middleware early in the application lifecycle
+        $router = app('router');
+        
+        // Try multiple approaches to ensure the middleware runs
+        $router->pushMiddlewareToGroup('web', \Ofthewildfire\EnhancedRoleSystem\Middleware\ResourceAccessRedirectMiddleware::class);
+        
+        // Also register as a global middleware
+        $kernel = app(\Illuminate\Contracts\Http\Kernel::class);
+        $kernel->pushMiddleware(\Ofthewildfire\EnhancedRoleSystem\Middleware\ResourceAccessRedirectMiddleware::class);
+        
+        // Register as named middleware too
+        $router->aliasMiddleware('resource-redirect', \Ofthewildfire\EnhancedRoleSystem\Middleware\ResourceAccessRedirectMiddleware::class);
     }
 
     protected function registerPolicies(): void
