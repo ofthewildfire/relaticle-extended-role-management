@@ -29,7 +29,7 @@ class ResourceAccessRedirectMiddleware
             $redirectUrl = session()->pull('login_redirect_url');
             $debugInfo['using_login_redirect'] = $redirectUrl;
             session()->flash('debug_info', $debugInfo);
-            return redirect()->to($redirectUrl);
+            return redirect($redirectUrl);
         }
 
         // Check BEFORE processing the request if user doesn't have access
@@ -54,9 +54,9 @@ class ResourceAccessRedirectMiddleware
                     session()->flash('debug_info', $debugInfo);
 
                     if ($firstAccessibleResource) {
-                        return redirect()->to("/app/team/{$team->id}/{$firstAccessibleResource}");
+                        return redirect("/app/team/{$team->id}/{$firstAccessibleResource}");
                     } else {
-                        return redirect()->to("/app/team/{$team->id}")
+                        return redirect("/app/team/{$team->id}")
                             ->with('error', 'You do not have access to any resources in this team.');
                     }
                 }
@@ -72,7 +72,7 @@ class ResourceAccessRedirectMiddleware
                         session()->flash('debug_info', $debugInfo);
 
                         if ($newUrl) {
-                            return redirect()->to($newUrl);
+                            return redirect($newUrl);
                         } else {
                             // Show debug info instead of generic error
                             return response()->view('enhanced-role-system::debug', [
@@ -103,7 +103,7 @@ class ResourceAccessRedirectMiddleware
                     session()->flash('debug_info', $debugInfo);
 
                     if ($newUrl) {
-                        return redirect()->to($newUrl);
+                        return redirect($newUrl);
                     }
                 }
             }
@@ -127,10 +127,10 @@ class ResourceAccessRedirectMiddleware
                 session()->flash('debug_info', $debugInfo);
 
                 if ($newUrl) {
-                    return redirect()->to($newUrl);
+                    return redirect($newUrl);
                 } else {
                     // If no accessible resource found, redirect to team dashboard
-                    return redirect()->to("/app/team/{$team->id}")
+                    return redirect("/app/team/{$team->id}")
                         ->with('error', 'You do not have access to any resources in this team.');
                 }
             }
