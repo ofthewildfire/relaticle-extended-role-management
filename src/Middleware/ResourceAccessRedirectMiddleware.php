@@ -192,16 +192,15 @@ class ResourceAccessRedirectMiddleware
             $remaining = $matches[3]; // any additional path
 
             if ($firstAccessibleResource !== $currentResource) {
-                    $baseUrl . $firstAccessibleResource;
+                $newUrl = $firstAccessibleResource;
 
                 // Only append remaining path if it's just a simple list view (no specific record IDs)
                 // This prevents redirecting to a record that might not exist in the new resource
                 if (empty($remaining) || $remaining === '/' || preg_match('#^/?$#', $remaining)) {
-                    $baseUrl .= $remaining;
+                    $newUrl .= $remaining;
                 }
 
-                return $baseUrl;
-                // return $newUrl;
+                return $newUrl;
             }
         }
 
