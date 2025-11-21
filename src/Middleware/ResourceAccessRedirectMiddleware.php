@@ -149,7 +149,7 @@ class ResourceAccessRedirectMiddleware
         $path = $request->path();
 
         // Check if this matches the pattern: app/team/{id}/{resource} OR just app/team/{id}
-        return preg_match('#^app/team/\d+(/[a-zA-Z]*)?#', $path);
+        return (bool) preg_match('#^app/team/\d+(/[a-zA-Z]*)?#', $path);
     }
 
     protected function getCurrentResource(Request $request): ?string
