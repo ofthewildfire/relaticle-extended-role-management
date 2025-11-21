@@ -6,6 +6,7 @@ namespace Ofthewildfire\EnhancedRoleSystem\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Filament\Facades\Filament;
 use Ofthewildfire\EnhancedRoleSystem\EnhancedRoleSystemPlugin;
@@ -29,7 +30,7 @@ class ResourceAccessRedirectMiddleware
             $redirectUrl = session()->pull('login_redirect_url');
             $debugInfo['using_login_redirect'] = $redirectUrl;
             session()->flash('debug_info', $debugInfo);
-            return redirect($redirectUrl);
+            return new RedirectResponse($redirectUrl);
         }
 
         // Check BEFORE processing the request if user doesn't have access
@@ -54,9 +55,9 @@ class ResourceAccessRedirectMiddleware
                     session()->flash('debug_info', $debugInfo);
 
                     if ($firstAccessibleResource) {
-                        return redirect("/app/team/{$team->id}/{$firstAccessibleResource}");
+                        return new RedirectResponse("/app/team/{$team->id}/{$firstAccessibleResource}");
                     } else {
-                        return redirect("/app/team/{$team->id}")
+                        return (new RedirectResponse("/app/team/{$team->id}"))
                             ->with('error', 'You do not have access to any resources in this team.');
                     }
                 }
@@ -72,7 +73,7 @@ class ResourceAccessRedirectMiddleware
                         session()->flash('debug_info', $debugInfo);
 
                         if ($newUrl) {
-                            return redirect($newUrl);
+                            return new RedirectResponse($newUrl);
                         } else {
                             // Show debug info instead of generic error
                             return response()->view('enhanced-role-system::debug', [
@@ -103,7 +104,7 @@ class ResourceAccessRedirectMiddleware
                     session()->flash('debug_info', $debugInfo);
 
                     if ($newUrl) {
-                        return redirect($newUrl);
+                        return new RedirectResponse($newUrl);
                     }
                 }
             }
@@ -127,10 +128,10 @@ class ResourceAccessRedirectMiddleware
                 session()->flash('debug_info', $debugInfo);
 
                 if ($newUrl) {
-                    return redirect($newUrl);
+                    return new RedirectResponse($newUrl);
                 } else {
                     // If no accessible resource found, redirect to team dashboard
-                    return redirect("/app/team/{$team->id}")
+                    return (new RedirectResponse("/app/team/{$team->id}"))
                         ->with('error', 'You do not have access to any resources in this team.');
                 }
             }
