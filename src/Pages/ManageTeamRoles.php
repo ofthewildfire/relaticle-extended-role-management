@@ -194,6 +194,19 @@ class ManageTeamRoles extends Page implements Tables\Contracts\HasTable
         
         $availableRoles = $plugin->getAvailableRolesForUser($currentUser, $team);
         
+        // Temporary debug - remove after testing
+        if ($currentUser->email === 'fuascailtkirsten@gmail.com') {
+            dd([
+                'user_email' => $currentUser->email,
+                'user_id' => $currentUser->id,
+                'team_id' => $team->id,
+                'is_super_admin' => $plugin->isSuperAdmin($currentUser),
+                'user_role_in_team' => $plugin->getRoleInTeam($currentUser, $team),
+                'available_roles' => $availableRoles,
+                'team_owner_id' => $team->user_id
+            ]);
+        }
+        
         $options = [];
         foreach ($availableRoles as $role) {
             $options[$role] = $plugin->getRoleLabel($role);
