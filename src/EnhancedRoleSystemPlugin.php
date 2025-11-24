@@ -183,7 +183,7 @@ class EnhancedRoleSystemPlugin implements Plugin
         
         // Team owners can assign any role (they created the team)
         if ($team->user_id === $user->id) {
-            return ['viewer', 'member', 'admin', 'super_admin'];
+            return ['viewer', 'member', 'editor', 'admin', 'super_admin'];
         }
         
         $userRole = $this->getRoleInTeam($user, $team);
