@@ -126,8 +126,9 @@ class EnhancedRoleSystemPlugin implements Plugin
         $roleHierarchy = [
             'viewer' => 1,
             'member' => 2,
-            'admin' => 3,
-            'super_admin' => 4,
+            'editor' => 3,
+            'admin' => 4,
+            'super_admin' => 5,
         ];
 
         return ($roleHierarchy[$userRole] ?? 0) >= ($roleHierarchy[$minimumRole] ?? 999);
@@ -155,6 +156,7 @@ class EnhancedRoleSystemPlugin implements Plugin
         return match($role) {
             'viewer' => 'Viewer',
             'member' => 'Member',
+            'editor' => 'Editor',
             'admin' => 'Admin',
             'super_admin' => 'Super Admin',
             default => ucfirst($role),
@@ -166,6 +168,7 @@ class EnhancedRoleSystemPlugin implements Plugin
         return match($role) {
             'viewer' => 'gray',
             'member' => 'blue',
+            'editor' => 'yellow',
             'admin' => 'green',
             'super_admin' => 'red',
             default => 'gray',
@@ -186,8 +189,9 @@ class EnhancedRoleSystemPlugin implements Plugin
         $userRole = $this->getRoleInTeam($user, $team);
         
         return match($userRole) {
-            'super_admin' => ['viewer', 'member', 'admin', 'super_admin'],
-            'admin' => ['viewer', 'member', 'admin'],
+            'super_admin' => ['viewer', 'member', 'editor', 'admin', 'super_admin'],
+            'admin' => ['viewer', 'member', 'editor', 'admin'],
+            'editor' => [],
             default => [],
         };
     }
@@ -220,6 +224,7 @@ class EnhancedRoleSystemPlugin implements Plugin
         return match($userRole) {
             'super_admin' => 'delete',
             'admin' => 'delete',
+            'editor' => 'edit',
             'member' => 'create',
             'viewer' => 'view',
             default => 'none',

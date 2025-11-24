@@ -229,15 +229,16 @@ class ManageTeamRoles extends Page implements Tables\Contracts\HasTable
         $roleHierarchy = [
             'viewer' => 1,
             'member' => 2,
-            'admin' => 3,
-            'super_admin' => 4,
+            'editor' => 3,
+            'admin' => 4,
+            'super_admin' => 5,
         ];
         
         $currentLevel = $roleHierarchy[$currentUserRole] ?? 0;
         $targetLevel = $roleHierarchy[$targetUserRole] ?? 0;
         
         return $currentLevel > $targetLevel || 
-               ($currentUserRole === 'admin' && $targetUserRole !== 'super_admin');
+               ($currentUserRole === 'admin' && !in_array($targetUserRole, ['admin', 'super_admin']));
     }
 
     protected function canRemoveUser(User $user): bool
