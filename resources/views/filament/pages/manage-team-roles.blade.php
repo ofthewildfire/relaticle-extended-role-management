@@ -23,6 +23,12 @@
                             <span class="text-sm text-gray-500 dark:text-gray-400">Can edit own entries and create new ones</span>
                         </div>
                         <div class="flex items-center space-x-3">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-orange-700 dark:text-white-200">
+                                Editor
+                            </span>
+                            <span class="text-sm text-gray-500 dark:text-gray-400">Full content access, zero admin access!</span>
+                        </div>
+                        <div class="flex items-center space-x-3">
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-700 dark:text-green-200">
                                 Admin
                             </span>
